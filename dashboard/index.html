@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Overlord — AI Dev Agent</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.development.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.development.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+    <link rel="stylesheet"
+        href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: #0D0D1A;
+            color: #fff;
+            font-family: 'Segoe UI', sans-serif;
+        }
+
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: #0D0D1A;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #00D4FF;
+            border-radius: 3px;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="root"></div>
+    <script type="text/babel">
+        const { useState, useEffect, useRef } = React;
+
+        const INTENTS = {
+            bug_fix: { label: "Bug Fix", color: "#FF6B6B" },
+            code_review: { label: "Code Review", color: "#FFD93D" },
+            code_generation: { label: "Code Generation", color: "#00D4FF" },
+            general: { label: "General", color: "#7B2FFF" }
+        };
+
+        function Header() {
+            return (
+                <div style={{
+                    background: "#0D0D1A",
+                    borderBottom: "1px solid #1a1a3e",
+                    padding: "16px 32px",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    position: "sticky",
+                    top: 0,
+                    zIndex: 100
+                }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                        <div style={{
+                            width: 36, height: 36,
+                            background: "linear-gradient(135deg, #00D4FF, #7B2FFF)",
+                            borderRadius: 8,
+                            display: "flex", alignItems: "center", justifyContent: "center",
+                            fontWeight: "bold", fontSize: 16
+                        }}>O</div>
+                        <div>
+                            <div style={{ fontWeight: "bold", fontSize: 18, letterSpacing: 1 }}>OVERLORD</div>
+                            <div style={{ fontSize: 11, color: "#00D4FF" }}>AI Dev Agent Platform</div>
+                        </div>
+                    </div>
+                    <div style={{
+                        background: "#00FFB3",
+                        color: "#0D0D1A",
+                        padding: "4px 12px",
+                        borderRadius: 20,
+                        fontSize: 12,
+                        fontWeight: "bold"
+                    }}>● LIVE</div>
+                </div>
+            );
+        }
+
+        function IntentBadge({ intent }) {
+            const config = INTENTS[intent] || INTENTS.general;
+            return (
+                <span style={{
+                    background: config.color + "22",
+                    color: config.color,
+                    border: `1px solid ${config.color}44`,
+                    padding: "2px 10px",
+                    borderRadius: 20,
+                    fontSize: 12,
+                    fontWeight: "bold"
+                }}>{config.label}</span>
+            );
+        }
+
+        function ResponseCard({ item }) {
+            useEffect(() => {
+                document.querySelectorAll('pre code').forEach(el => {
+                    hljs.highlightElement(el);
+                });
+            }, []);
+
+            const formatResponse = (text) => {
+                const parts = text.split(/(```[\w]*\n[\s\S]*?```)/g);
+                return parts.map((part, i) => {
+                    if (part.startsWith('```')) {
+                        const code = part.replace(/```[\w]*\n/, '').replace(/```$/, '');
+                        return (
+                            <pre key={i} style={{ margin: "12px 0", borderRadius: 8, overflow: "hidden" }}>
+                                <code>{code}</code>
+                            </pre>
+                        );
+                    }
+                    return <p key={i} style={{ marginBottom: 8, lineHeight: 1.7, color: "#B0B8CC" }}>{part}</p>;
+                });
+            };
+
+            return (
+                <div style={{
+                    background: "#15152E",
+                    borderRadius: 12,
+                    padding: 24,
+                    marginBottom: 16,
+                    border: "1px solid #1a1a3e"
+                }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}>
+                        <IntentBadge intent={item.intent} />
+                        <span style={{ color: "#555", fontSize: 12 }}>{item.timestamp}</span>
+                    </div>
+                    <div style={{
+                        background: "#0D0D1A",
+                        borderRadius: 8,
+                        padding: "12px 16px",
+                        marginBottom: 16,
+                        borderLeft: "3px solid #00D4FF"
+                    }}>
+                        <span style={{ color: "#00D4FF", fontSize: 12, fontWeight: "bold" }}>REQUEST </span>
+                        <span style={{ color: "#fff" }}>{item.request}</span>
+                    </div>
+                    <div style={{ fontSize: 14 }}>
+                        {formatResponse(item.response)}
+                    </div>
+                </div>
+            );
+        }
+
+        function App() {
+            const [request, setRequest] = useState("");
+            const [history, setHistory] = useState([]);
+            const [loading, setLoading] = useState(false);
+            const [error, setError] = useState(null);
+            const bottomRef = useRef(null);
+
+            useEffect(() => {
+                bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+            }, [history]);
+
+            const handleSubmit = async () => {
+                if (!request.trim() || loading) return;
+                setLoading(true);
+                setError(null);
+                try {
+                    const res = await fetch("/generate", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ request })
+                    });
+                    const data = await res.json();
+                    if (data.success) {
+                        setHistory(prev => [...prev, {
+                            ...data.data,
+                            timestamp: new Date().toLocaleTimeString()
+                        }]);
+                        setRequest("");
+                    } else {
+                        setError("Something went wrong. Try again.");
+                    }
+                } catch (e) {
+                    setError("Cannot connect to Overlord server.");
+                } finally {
+                    setLoading(false);
+                }
+            };
+
+            const handleKey = (e) => {
+                if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) handleSubmit();
+            };
+
+            return (
+                <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column" }}>
+                    <Header />
+                    <div style={{ flex: 1, maxWidth: 900, margin: "0 auto", width: "100%", padding: "32px 24px" }}>
+
+                        {history.length === 0 && (
+                            <div style={{ textAlign: "center", padding: "80px 0" }}>
+                                <div style={{ fontSize: 48, marginBottom: 16 }}>⚡</div>
+                                <div style={{ fontSize: 24, fontWeight: "bold", marginBottom: 8 }}>
+                                    Welcome to Overlord
+                                </div>
+                                <div style={{ color: "#B0B8CC", fontSize: 16 }}>
+                                    Your AI coding agent. Type a request below to get started.
+                                </div>
+                                <div style={{ display: "flex", gap: 12, justifyContent: "center", marginTop: 32, flexWrap: "wrap" }}>
+                                    {[
+                                        "Fix a divide by zero bug",
+                                        "Review my authentication code",
+                                        "Generate a REST API endpoint"
+                                    ].map(s => (
+                                        <button key={s} onClick={() => setRequest(s)} style={{
+                                            background: "#15152E",
+                                            border: "1px solid #1a1a3e",
+                                            color: "#B0B8CC",
+                                            padding: "8px 16px",
+                                            borderRadius: 20,
+                                            cursor: "pointer",
+                                            fontSize: 13
+                                        }}>{s}</button>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        {history.map((item, i) => <ResponseCard key={i} item={item} />)}
+
+                        {error && (
+                            <div style={{
+                                background: "#FF6B6B22",
+                                border: "1px solid #FF6B6B44",
+                                color: "#FF6B6B",
+                                padding: "12px 16px",
+                                borderRadius: 8,
+                                marginBottom: 16
+                            }}>{error}</div>
+                        )}
+
+                        <div ref={bottomRef} />
+                    </div>
+
+                    <div style={{
+                        position: "sticky",
+                        bottom: 0,
+                        background: "#0D0D1A",
+                        borderTop: "1px solid #1a1a3e",
+                        padding: "20px 24px"
+                    }}>
+                        <div style={{ maxWidth: 900, margin: "0 auto" }}>
+                            <div style={{
+                                display: "flex",
+                                gap: 12,
+                                background: "#15152E",
+                                borderRadius: 12,
+                                padding: 12,
+                                border: "1px solid #1a1a3e"
+                            }}>
+                                <textarea
+                                    value={request}
+                                    onChange={e => setRequest(e.target.value)}
+                                    onKeyDown={handleKey}
+                                    placeholder="Describe what you need... (Ctrl+Enter to send)"
+                                    rows={3}
+                                    style={{
+                                        flex: 1,
+                                        background: "transparent",
+                                        border: "none",
+                                        outline: "none",
+                                        color: "#fff",
+                                        fontSize: 15,
+                                        resize: "none",
+                                        fontFamily: "inherit"
+                                    }}
+                                />
+                                <button
+                                    onClick={handleSubmit}
+                                    disabled={loading || !request.trim()}
+                                    style={{
+                                        background: loading ? "#333" : "linear-gradient(135deg, #00D4FF, #7B2FFF)",
+                                        border: "none",
+                                        borderRadius: 8,
+                                        color: "#fff",
+                                        padding: "0 24px",
+                                        cursor: loading ? "not-allowed" : "pointer",
+                                        fontWeight: "bold",
+                                        fontSize: 14,
+                                        minWidth: 80
+                                    }}
+                                >
+                                    {loading ? "..." : "⚡ Send"}
+                                </button>
+                            </div>
+                            <div style={{ color: "#555", fontSize: 12, marginTop: 8, textAlign: "center" }}>
+                                Ctrl+Enter to send · Powered by Overlord AI
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+    </script>
+</body>
+
+</html>
