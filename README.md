@@ -200,7 +200,7 @@ MIT License — free to use, modify, and distribute.
 
 ## 🌍 Built By
 
-Built in Tunisia 🇹🇳 in 48 hours using Claude AI.
+Built  in 48 hours using Claude AI.
 
 *"We don't wait for the future. We build it."*
 
